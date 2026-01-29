@@ -51,8 +51,5 @@ jobs:
             echo "Installing project requirements..."
             pip3 install -r requirements.txt
 
-            echo "Stopping old app..."
-            pkill -f app.py || true
-
             echo "Starting Python app..."
             nohup python3 app.py > output.log 2>&1 &
