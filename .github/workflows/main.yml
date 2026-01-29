@@ -30,7 +30,7 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: 22
           script: |
-            APP_DIR=/home/ubuntu/pythonapp
+            APP_DIR=/home/ec2-user/pythonapp
 
             # If folder doesn't exist → clone repo
             if [ ! -d "$APP_DIR" ]; then
