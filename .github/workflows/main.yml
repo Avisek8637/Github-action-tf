@@ -1,4 +1,4 @@
-name: Deploy Python App
+name: Deploy Python App via SSH
 
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Checkout Code (for CI side)
+      - name: 📥 Checkout Code (GitHub side)
         uses: actions/checkout@v3
 
       - name: 🐍 Set up Python
@@ -18,11 +18,13 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 📦 Install Dependencies (CI test)
+      - name: 📦 Install Dependencies (CI check)
         run: |
-          pip install -r requirements.txt || true
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
 
-      - name: 🔐 SSH into Server & Deploy App
+      - name: 🔐 SSH into Server & Deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -30,26 +32,42 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: 22
           script: |
-            APP_DIR=/home/ec2-user/pythonapp
+            echo "Connected to server"
 
-            # If folder doesn't exist → clone repo
+            # Use home directory of current user (works for ubuntu, ec2-user, root, etc.)
+            APP_DIR=$HOME/pythonapp
+
+            # Install git & python if missing
+            if ! command -v git &> /dev/null; then
+              echo "Installing git..."
+              sudo apt update -y || sudo yum update -y
+              sudo apt install git -y || sudo yum install git -y
+            fi
+
+            if ! command -v python3 &> /dev/null; then
+              echo "Installing python..."
+              sudo apt install python3-pip -y || sudo yum install python3-pip -y
+            fi
+
+            # Clone repo if not exists
             if [ ! -d "$APP_DIR" ]; then
               echo "Cloning repository..."
               git clone https://github.com/CloudTechDevOps/docker_python_flask-project.git $APP_DIR
             else
-              echo "Repository exists, pulling latest code..."
+              echo "Repo exists. Pulling latest code..."
               cd $APP_DIR
               git pull origin main
             fi
 
             cd $APP_DIR
 
-            echo "Installing Python & pip if missing..."
-            sudo apt update -y
-            sudo apt install python3-pip -y
-
-            echo "Installing project requirements..."
+            echo "Installing requirements..."
             pip3 install -r requirements.txt
+
+            echo "Stopping old app if running..."
+            pkill -f app.py || true
 
             echo "Starting Python app..."
             nohup python3 app.py > output.log 2>&1 &
+
+            echo "Deployment Finished ✅"
